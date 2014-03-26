@@ -63,6 +63,71 @@ function tokenize(input) {
 	return tokens;
 }
 
+function transform(closes, token, startNode, endNode) {
+	var name = closes.token.name;
+
+	switch (name) {
+		case 'b':
+		case 'i':
+		case 'u':
+		case 's':
+		case 'sub':
+		case 'sup':
+			startNode.text = '<' + name + '>';
+			endNode.text = '</' + name + '>';
+			return true;
+
+		case 'left':
+		case 'center':
+		case 'right':
+			startNode.text = '<div class="align-' + name + '">';
+			endNode.text = '</div>';
+			return true;
+
+		case 'quote':
+			startNode.text = '<blockquote>';
+
+			var quotes = closes.token.value;
+
+			if (quotes) {
+				startNode.text += '<header><cite>' + escapeContent(quotes) + '</cite> wrote:</header> ';
+			}
+
+			endNode.text = '</blockquote>';
+			return true;
+
+		case 'url':
+			var info = linkInfo(closes.token.value);
+
+			if (info.allowed) {
+				// TODO: rel="nofollow noreferrer" on external links if URIs ever become private
+				startNode.text = '<a href="' + escapeAttributeValue(closes.token.value) + (info.internal ? '">' : '" rel="nofollow">');
+				endNode.text = '</a>';
+				return true;
+			}
+
+			endNode.text = token.text;
+			return false;
+
+		case 'color':
+			var colour = closes.token.value.trim();
+			var m = CSS3_OPAQUE_COLOUR.exec(colour);
+
+			if (m) {
+				if (m[1] !== undefined) {
+					colour = '#' + m[1];
+				}
+
+				startNode.text = '<span style="color: ' + colour + ';">';
+				endNode.text = '</span>';
+				return true;
+			}
+
+			endNode.text = token.text;
+			return false;
+	}
+}
+
 function render(input) {
 	var tokens = tokenize(input);
 	var openTags = [];
@@ -70,71 +135,10 @@ function render(input) {
 	var top = null;
 
 	function push(text) {
-		top = { text: text, next: top };
-	}
+		top = { text: text, next: top, prev: null };
 
-	function transform(closes, token) {
-		var name = closes.token.name;
-
-		switch (name) {
-			case 'b':
-			case 'i':
-			case 'u':
-			case 's':
-			case 'sub':
-			case 'sup':
-				closes.node.text = '<' + name + '>';
-				push('</' + name + '>');
-				return top;
-
-			case 'left':
-			case 'center':
-			case 'right':
-				closes.node.text = '<div class="align-' + name + '">';
-				push('</div>');
-				return top;
-
-			case 'quote':
-				closes.node.text = '<blockquote>';
-
-				var quotes = closes.token.value;
-
-				if (quotes) {
-					closes.node.text += '<header><cite>' + escapeContent(quotes) + '</cite> wrote:</header> ';
-				}
-
-				push('</blockquote>');
-				return top;
-
-			case 'url':
-				var info = linkInfo(closes.token.value);
-
-				if (info.allowed) {
-					// TODO: rel="nofollow noreferrer" on external links if URIs ever become private
-					closes.node.text = '<a href="' + escapeAttributeValue(closes.token.value) + (info.internal ? '">' : '" rel="nofollow">');
-					push('</a>');
-					return top;
-				}
-
-				push(token.text);
-				return null;
-
-			case 'color':
-				var colour = closes.token.value.trim();
-				var m = CSS3_OPAQUE_COLOUR.exec(colour);
-
-				if (m) {
-					if (m[1] !== undefined) {
-						colour = '#' + m[1];
-					}
-
-					closes.node.text = '<span style="color: ' + colour + ';">';
-					push('</span>');
-					return top;
-				}
-
-				push(token.text);
-				return null;
+		if (top.next) {
+			top.next.prev = top;
 		}
 	}
 
@@ -148,7 +152,7 @@ function render(input) {
 
 			case OPEN_TAG:
 				push(escapeContent(token.text));
-				openTags.push({ token: token, node: top });
+				openTags.push({ token: token, node: top, closedOverBy: [] });
 				openTagNames.push(token.name);
 				break;
 
@@ -161,10 +165,40 @@ function render(input) {
 				}
 
 				var closes = openTags[closesIndex];
-				openTagNames.splice(closesIndex);
-				openTags.splice(closesIndex);
+				openTagNames.splice(closesIndex, 1);
+				openTags.splice(closesIndex, 1);
 
-				transform(closes, token);
+				transform(closes, token, closes.node, top = { text: null, next: top });
+				top.next.prev = top;
+
+				var j;
+
+				for (j = closesIndex; j < openTags.length; j++) {
+					openTags[j].closedOverBy.push(top);
+				}
+
+				for (j = 0; j < closes.closedOverBy.length; j++) {
+					var closedOverBy = closes.closedOverBy[j];
+					var newClosingNode = { text: null, next: closedOverBy.next };
+					var newOpeningNode = { text: null, next: closedOverBy };
+
+					if (transform(closes, {}, newOpeningNode, newClosingNode)) {
+						closedOverBy.next = newClosingNode;
+						closedOverBy.prev.next = newOpeningNode;
+						closedOverBy.prev = newOpeningNode;
+
+						// Turn references to closedOverBy into its next node without changing the effective linked list
+						var originalNext = closedOverBy.next;
+						closedOverBy.next = closedOverBy.next.next;
+						closedOverBy.next.prev = closedOverBy;
+						closedOverBy.prev = closedOverBy.prev.next = {
+							text: closedOverBy.text,
+							next: closedOverBy,
+							prev: closedOverBy.prev
+						};
+						closedOverBy.text = originalNext.text;
+					}
+				}
 
 				break;
 
