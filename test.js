@@ -53,6 +53,11 @@ var testCases = [
 		input: 'Have you visited http://example.com/?',
 		expected: 'Have you visited <a href="http://example.com/" rel="nofollow">http://example.com/</a>?'
 	},
+	{
+		name: 'symbols',
+		input: '(c) (C) (r) (R) (tm) (TM)',
+		expected: '© © ® ® ™ ™'
+	},
 ];
 
 function attempt(test) {
