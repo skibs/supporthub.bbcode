@@ -58,6 +58,11 @@ var testCases = [
 		input: '(c) (C) (r) (R) (tm) (TM)',
 		expected: '© © ® ® ™ ™'
 	},
+	{
+		name: 'series navigation links',
+		input: '[-, -, -] [1, 2, 3] [-, 2, 3] [1, 2, -]',
+		expected: '&lt;&lt;&lt; PREV | FIRST | NEXT &gt;&gt;&gt; <a href="/submissions/1">&lt;&lt;&lt; PREV</a> | <a href="/submissions/2">FIRST</a> | <a href="/submissions/3">NEXT &gt;&gt;&gt;</a> &lt;&lt;&lt; PREV | <a href="/submissions/2">FIRST</a> | <a href="/submissions/3">NEXT &gt;&gt;&gt;</a> <a href="/submissions/1">&lt;&lt;&lt; PREV</a> | <a href="/submissions/2">FIRST</a> | NEXT &gt;&gt;&gt;'
+	},
 ];
 
 function attempt(test) {

@@ -42,11 +42,12 @@ var USERNAME_ONLY_LINK = 'USERNAME_ONLY_LINK';
 var HORIZONTAL_RULE = 'HORIZONTAL_RULE';
 var LINE_BREAK = 'LINE_BREAK';
 var AUTOMATIC_LINK = 'AUTOMATIC_LINK';
+var SERIES_NAVIGATION = 'SERIES_NAVIGATION';
 
 var CSS3_OPAQUE_COLOUR = /^(?:#?([\da-f]{3}|[\da-f]{6})|rgb\((?:(?:\s*(?:25[0-5]|2[0-4]\d|[01]?\d{1,2})\s*,){2}\s*(?:25[0-5]|2[0-4]\d|[01]?\d{1,2})\s*|(?:\s*(?:100|0?\d{1,2})%\s*,){2}\s*(?:100|0?\d{1,2})%\s*)\)|hsl\(\s*(?:180|1[0-7]\d|0?\d{1,2})\s*,\s*(?:100|0?\d{1,2})%\s*,\s*(?:100|0?\d{1,2})%\s*\)|black|silver|gr[ae]y|white|maroon|red|purple|fuchsia|green|lime|olive|yellow|navy|blue|teal|aqua|aliceblue|antiquewhite|aqua|aquamarine|azure|beige|bisque|blanchedalmond|blueviolet|brown|burlywood|cadetblue|chartreuse|chocolate|coral|cornflowerblue|cornsilk|crimson|cyan|darkblue|darkcyan|darkgoldenrod|darkgr[ae]y|darkgreen|darkkhaki|darkmagenta|darkolivegreen|darkorange|darkorchid|darkred|darksalmon|darkseagreen|darkslateblue|darkslategr[ae]y|darkturquoise|darkviolet|deeppink|deepskyblue|dimgr[ae]y|dodgerblue|firebrick|floralwhite|forestgreen|gainsboro|ghostwhite|gold|goldenrod|greenyellow|honeydew|hotpink|indianred|indigo|ivory|khaki|lavender|lavenderblush|lawngreen|lemonchiffon|lightblue|lightcoral|lightcyan|lightgoldenrodyellow|lightgr[ae]y|lightgreen|lightpink|lightsalmon|lightseagreen|lightskyblue|lightslategr[ae]y|lightsteelblue|lightyellow|limegreen|linen|mediumaquamarine|mediumblue|mediumorchid|mediumpurple|mediumseagreen|mediumslateblue|mediumspringgreen|mediumturquoise|mediumvioletred|midnightblue|mintcream|mistyrose|moccasin|navajowhite|oldlace|olivedrab|orange|orangered|orchid|palegoldenrod|palegreen|paleturquoise|palevioletred|papayawhip|peachpuff|peru|pink|plum|powderblue|rosybrown|royalblue|saddlebrown|salmon|sandybrown|seagreen|seashell|sienna|skyblue|slateblue|slategr[ae]y|snow|springgreen|steelblue|tan|thistle|tomato|turquoise|violet|wheat|whitesmoke|yellowgreen)$/i;
 
 function tokenize(input) {
-	var TOKEN = /\[([bisu]|sub|sup|quote|left|center|right)\]|\[\/([bisu]|sub|sup|color|quote|left|center|right|url)\]|\[(color|quote|url)=(?:"([^"]+)"|(\S*?))\]|:(icon|link)([\w-]+):|:([\w-]+)icon:|(\r?\n?-{5,}\r?\n?)|(\r\n|[\r\n\u2028\u2029])|\((c|r|tm)\)|(\bhttps?:\/\/(?:[^\s?!.[\]]|[?!.](?=\w))+)|[^-h\r\n\u2028\u2029([:]+|[\S\s]/gi;
+	var TOKEN = /\[([bisu]|sub|sup|quote|left|center|right)\]|\[\/([bisu]|sub|sup|color|quote|left|center|right|url)\]|\[(color|quote|url)=(?:"([^"]+)"|(\S*?))\]|:(icon|link)([\w-]+):|:([\w-]+)icon:|(\r?\n?-{5,}\r?\n?)|(\r\n|[\r\n\u2028\u2029])|\((c|r|tm)\)|(\bhttps?:\/\/(?:[^\s?!.[\]]|[?!.](?=\w))+)|\[(\d+|-)\s*,\s*(\d+|-)\s*,\s*(\d+|-)\]|[^-h\r\n\u2028\u2029([:]+|[\S\s]/gi;
 	var tokens = [];
 	var m;
 
@@ -61,6 +62,7 @@ function tokenize(input) {
 			m[9] !== undefined  ? { type: HORIZONTAL_RULE } :
 			m[10] !== undefined ? { type: LINE_BREAK } :
 			m[12] !== undefined ? { type: AUTOMATIC_LINK } :
+			m[13] !== undefined ? { type: SERIES_NAVIGATION, previous: m[13], first: m[14], next: m[15] } :
 			                      { type: TEXT };
 
 		token.text = m[11] === undefined ? m[0] : symbols[m[11].toLowerCase()];
@@ -150,6 +152,19 @@ function render(input) {
 		tail.prev.next = tail;
 
 		return tail.prev;
+	}
+
+	function createSeriesLink(label, id) {
+		if (id === '-') {
+			return label;
+		}
+
+		// TODO: Pass submission root as an option/callback (three cheers for linked lists!)
+		return '<a href="/submissions/' + id + '">' + label + '</a>';
+	}
+
+	function createSeriesNavigation(token) {
+		return createSeriesLink('&lt;&lt;&lt; PREV', token.previous) + ' | ' + createSeriesLink('FIRST', token.first) + ' | ' + createSeriesLink('NEXT &gt;&gt;&gt;', token.next);
 	}
 
 	for (var i = 0; i < tokens.length; i++) {
@@ -252,6 +267,10 @@ function render(input) {
 				// TODO: Turn two consecutive line breaks into a paragraph break with other line breaks in between,
 				//       unless it’s U+2028. U+2029 should also become (remain) a paragraph break.
 				append('<br>');
+				break;
+
+			case SERIES_NAVIGATION:
+				append(createSeriesNavigation(token));
 				break;
 
 			default:
