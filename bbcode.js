@@ -140,14 +140,12 @@ function render(input) {
 	var tokens = tokenize(input);
 	var openTags = [];
 	var openTagNames = [];
-	var top = null;
+	var head = { text: null, prev: null, next: null };
+	var tail = head;
 
-	function push(text) {
-		top = { text: text, next: top, prev: null };
-
-		if (top.next) {
-			top.next.prev = top;
-		}
+	function append(text) {
+		tail = { text: text, prev: tail, next: null };
+		tail.prev.next = tail;
 	}
 
 	for (var i = 0; i < tokens.length; i++) {
@@ -155,12 +153,12 @@ function render(input) {
 
 		switch (token.type) {
 			case TEXT:
-				push(escapeContent(token.text));
+				append(escapeContent(token.text));
 				break;
 
 			case OPEN_TAG:
-				push(escapeContent(token.text));
-				openTags.push({ token: token, node: top, closedOverBy: [] });
+				append(escapeContent(token.text));
+				openTags.push({ token: token, node: tail, closedOverBy: [] });
 				openTagNames.push(token.name);
 				break;
 
@@ -168,7 +166,7 @@ function render(input) {
 				var closesIndex = openTagNames.lastIndexOf(token.name);
 
 				if (closesIndex === -1) {
-					push(token.text);
+					append(token.text);
 					break;
 				}
 
@@ -176,42 +174,43 @@ function render(input) {
 				openTagNames.splice(closesIndex, 1);
 				openTags.splice(closesIndex, 1);
 
-				transform(closes, token, closes.node, top = { text: null, next: top });
-				top.next.prev = top;
+				transform(closes, token, closes.node, tail = { text: null, prev: tail, next: null });
+				tail.prev.next = tail;
 
 				var j;
 
 				for (j = closesIndex; j < openTags.length; j++) {
-					openTags[j].closedOverBy.push(top);
+					openTags[j].closedOverBy.push(tail);
 				}
 
 				for (j = 0; j < closes.closedOverBy.length; j++) {
 					var closedOverBy = closes.closedOverBy[j];
-					var newClosingNode = { text: null, next: closedOverBy.next };
-					var newOpeningNode = { text: null, next: closedOverBy };
+					var newClosingNode = { text: null, prev: closedOverBy.prev, next: closedOverBy };
+					var newOpeningNode = { text: null, prev: closedOverBy, next: closedOverBy.next };
 
 					if (transform(closes, {}, newOpeningNode, newClosingNode)) {
-						closedOverBy.next = newClosingNode;
-						closedOverBy.prev.next = newOpeningNode;
-						closedOverBy.prev = newOpeningNode;
+						closedOverBy.prev.next = newClosingNode;
+						closedOverBy.prev = newClosingNode;
+						closedOverBy.next.prev = newOpeningNode;
+						closedOverBy.next = newOpeningNode;
 
 						// Turn references to closedOverBy into its next node without changing the effective linked list
-						var originalNext = closedOverBy.next;
-						closedOverBy.next = closedOverBy.next.next;
-						closedOverBy.next.prev = closedOverBy;
-						closedOverBy.prev = closedOverBy.prev.next = {
+						var originalPrev = closedOverBy.prev;
+						closedOverBy.prev = closedOverBy.prev.prev;
+						closedOverBy.prev.next = closedOverBy;
+						closedOverBy.next = closedOverBy.next.prev = {
 							text: closedOverBy.text,
-							next: closedOverBy,
-							prev: closedOverBy.prev
+							prev: closedOverBy,
+							next: closedOverBy.next
 						};
-						closedOverBy.text = originalNext.text;
+						closedOverBy.text = originalPrev.text;
 					}
 				}
 
 				break;
 
 			case ICON_AND_USERNAME_LINK:
-				push(
+				append(
 					'<a href="/users/' + token.username + '/">' +
 					'<img src="/users/' + token.username + '/image"> ' +
 					token.username + '</a>'
@@ -220,11 +219,11 @@ function render(input) {
 				break;
 
 			case USERNAME_ONLY_LINK:
-				push('<a href="/users/' + token.username + '/">' + token.username + '</a>');
+				append('<a href="/users/' + token.username + '/">' + token.username + '</a>');
 				break;
 
 			case ICON_ONLY_LINK:
-				push(
+				append(
 					'<a href="/users/' + token.username + '/">' +
 					'<img src="/users/' + token.username + '/image">' +
 					'</a>'
@@ -237,21 +236,21 @@ function render(input) {
 
 				if (info.allowed) {
 					// TODO: rel="nofollow noreferrer" on external links if URIs ever become private
-					push('<a href="' + escapeAttributeValue(token.text) + (info.internal ? '">' : '" rel="nofollow">') + escapeContent(token.text) + '</a>');
+					append('<a href="' + escapeAttributeValue(token.text) + (info.internal ? '">' : '" rel="nofollow">') + escapeContent(token.text) + '</a>');
 				} else {
-					push(escapeContent(token.text));
+					append(escapeContent(token.text));
 				}
 
 				break;
 
 			case HORIZONTAL_RULE:
-				push('<hr>');
+				append('<hr>');
 				break;
 
 			case LINE_BREAK:
 				// TODO: Turn two consecutive line breaks into a paragraph break with other line breaks in between,
 				//       unless it’s U+2028. U+2029 should also become (remain) a paragraph break.
-				push('<br>');
+				append('<br>');
 				break;
 
 			default:
@@ -259,14 +258,13 @@ function render(input) {
 		}
 	}
 
-	var result = [];
+	var result = '';
 
-	while (top) {
-		result.unshift(top.text);
-		top = top.next;
+	while (head = head.next) {
+		result += head.text;
 	}
 
-	return result.join('');
+	return result;
 }
 
 module.exports.render = render;
