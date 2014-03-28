@@ -140,12 +140,16 @@ function render(input) {
 	var tokens = tokenize(input);
 	var openTags = [];
 	var openTagNames = [];
-	var head = { text: null, prev: null, next: null };
-	var tail = head;
+	var head = { text: null, prev: null };
+	var tail = { text: null, prev: head, next: null };
+	head.next = tail;
 
 	function append(text) {
-		tail = { text: text, prev: tail, next: null };
+		tail.text = text;
+		tail = { text: null, prev: tail, next: null };
 		tail.prev.next = tail;
+
+		return tail.prev;
 	}
 
 	for (var i = 0; i < tokens.length; i++) {
@@ -157,8 +161,8 @@ function render(input) {
 				break;
 
 			case OPEN_TAG:
-				append(escapeContent(token.text));
-				openTags.push({ token: token, node: tail, closedOverBy: [] });
+				var openingNode = append(escapeContent(token.text));
+				openTags.push({ token: token, node: openingNode, closedOverBy: [] });
 				openTagNames.push(token.name);
 				break;
 
@@ -174,36 +178,33 @@ function render(input) {
 				openTagNames.splice(closesIndex, 1);
 				openTags.splice(closesIndex, 1);
 
-				transform(closes, token, closes.node, tail = { text: null, prev: tail, next: null });
-				tail.prev.next = tail;
+				var closingNode = append(null);
+				transform(closes, token, closes.node, closingNode);
 
 				var j;
 
 				for (j = closesIndex; j < openTags.length; j++) {
-					openTags[j].closedOverBy.push(tail);
+					openTags[j].closedOverBy.push({
+						insertOpeningNodeBefore: closingNode.next,
+						insertClosingNodeAfter: closingNode.prev
+					});
 				}
 
 				for (j = 0; j < closes.closedOverBy.length; j++) {
 					var closedOverBy = closes.closedOverBy[j];
-					var newClosingNode = { text: null, prev: closedOverBy.prev, next: closedOverBy };
-					var newOpeningNode = { text: null, prev: closedOverBy, next: closedOverBy.next };
+					var newOpeningNode = { text: null };
+					var newClosingNode = { text: null };
 
 					if (transform(closes, {}, newOpeningNode, newClosingNode)) {
-						closedOverBy.prev.next = newClosingNode;
-						closedOverBy.prev = newClosingNode;
-						closedOverBy.next.prev = newOpeningNode;
-						closedOverBy.next = newOpeningNode;
+						newOpeningNode.prev = closedOverBy.insertOpeningNodeBefore.prev;
+						newOpeningNode.next = closedOverBy.insertOpeningNodeBefore;
+						closedOverBy.insertOpeningNodeBefore.prev.next = newOpeningNode;
+						closedOverBy.insertOpeningNodeBefore.prev = newOpeningNode;
 
-						// Turn references to closedOverBy into its next node without changing the effective linked list
-						var originalPrev = closedOverBy.prev;
-						closedOverBy.prev = closedOverBy.prev.prev;
-						closedOverBy.prev.next = closedOverBy;
-						closedOverBy.next = closedOverBy.next.prev = {
-							text: closedOverBy.text,
-							prev: closedOverBy,
-							next: closedOverBy.next
-						};
-						closedOverBy.text = originalPrev.text;
+						newClosingNode.prev = closedOverBy.insertClosingNodeAfter;
+						newClosingNode.next = closedOverBy.insertClosingNodeAfter.next;
+						closedOverBy.insertClosingNodeAfter.next.prev = newClosingNode;
+						closedOverBy.insertClosingNodeAfter.next = newClosingNode;
 					}
 				}
 
@@ -261,7 +262,9 @@ function render(input) {
 	var result = '';
 
 	while (head = head.next) {
-		result += head.text;
+		if (head.text !== null) {
+			result += head.text;
+		}
 	}
 
 	return result;

@@ -36,7 +36,7 @@ var testCases = [
 	{
 		name: 'triple bad nesting',
 		input: '[i]one [b]two [s]three[/i] four[/b] five[/s]',
-		expected: '<i>one <b>two <s>three</s></b></i><b><s>four</s></b><s> five</s>'
+		expected: '<i>one <b>two <s>three</s></b></i><b><s> four</s></b><s> five</s>'
 	},
 	{
 		name: 'bad nesting involving bad tag',
