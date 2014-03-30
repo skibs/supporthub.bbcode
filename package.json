@@ -1,4 +1,5 @@
 {
+	"name": "phoenix-bbcode",
 	"version": "1.0.0",
 	"main": "bbcode",
 	"license": "MIT"
