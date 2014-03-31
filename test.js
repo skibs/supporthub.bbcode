@@ -63,10 +63,50 @@ var testCases = [
 		input: '[-, -, -] [1, 2, 3] [-, 2, 3] [1, 2, -]',
 		expected: '&lt;&lt;&lt; PREV | FIRST | NEXT &gt;&gt;&gt; <a href="/submissions/1">&lt;&lt;&lt; PREV</a> | <a href="/submissions/2">FIRST</a> | <a href="/submissions/3">NEXT &gt;&gt;&gt;</a> &lt;&lt;&lt; PREV | <a href="/submissions/2">FIRST</a> | <a href="/submissions/3">NEXT &gt;&gt;&gt;</a> <a href="/submissions/1">&lt;&lt;&lt; PREV</a> | <a href="/submissions/2">FIRST</a> | NEXT &gt;&gt;&gt;'
 	},
+	{
+		name: 'line breaks',
+		input: 'one\r\ntwo',
+		options: {
+			automaticParagraphs: true
+		},
+		expected: '<p>one<br>two</p>'
+	},
+	{
+		name: 'paragraphs',
+		input: 'one\r\n\r\ntwo',
+		options: {
+			automaticParagraphs: true
+		},
+		expected: '<p>one</p><p>two</p>'
+	},
+	{
+		name: 'paragraphs with extra line breaks',
+		input: 'one\n\n\ntwo',
+		options: {
+			automaticParagraphs: true
+		},
+		expected: '<p>one</p><br><p>two</p>'
+	},
+	{
+		name: 'forced line breaks',
+		input: 'one\u2028\u2028two',
+		options: {
+			automaticParagraphs: true
+		},
+		expected: '<p>one<br><br>two</p>'
+	},
+	{
+		name: 'forced paragraph breaks',
+		input: 'one\u2029two',
+		options: {
+			automaticParagraphs: true
+		},
+		expected: '<p>one</p><p>two</p>'
+	},
 ];
 
 function attempt(test) {
-	var output = bbcode.render(test.input);
+	var output = bbcode.render(test.input, test.options);
 
 	if (output === test.expected) {
 		console.log('\x1b[32m✔\x1b[0m \x1b[1m%s\x1b[0m passed', test.name);

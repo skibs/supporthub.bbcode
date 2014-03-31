@@ -41,6 +41,8 @@ var ICON_ONLY_LINK = 'ICON_ONLY_LINK';
 var USERNAME_ONLY_LINK = 'USERNAME_ONLY_LINK';
 var HORIZONTAL_RULE = 'HORIZONTAL_RULE';
 var LINE_BREAK = 'LINE_BREAK';
+var FORCED_LINE_BREAK = 'FORCED_LINE_BREAK';
+var FORCED_PARAGRAPH_BREAK = 'FORCED_PARAGRAPH_BREAK';
 var AUTOMATIC_LINK = 'AUTOMATIC_LINK';
 var SERIES_NAVIGATION = 'SERIES_NAVIGATION';
 
@@ -60,6 +62,8 @@ function tokenize(input) {
 			m[6] === 'link'     ? { type: USERNAME_ONLY_LINK, username: m[7] } :
 			m[8] !== undefined  ? { type: ICON_ONLY_LINK, username: m[8] } :
 			m[9] !== undefined  ? { type: HORIZONTAL_RULE } :
+			m[10] === '\u2028'  ? { type: FORCED_LINE_BREAK } :
+			m[10] === '\u2029'  ? { type: FORCED_PARAGRAPH_BREAK } :
 			m[10] !== undefined ? { type: LINE_BREAK } :
 			m[12] !== undefined ? { type: AUTOMATIC_LINK } :
 			m[13] !== undefined ? { type: SERIES_NAVIGATION, previous: m[13], first: m[14], next: m[15] } :
@@ -138,7 +142,9 @@ function transform(closes, token, startNode, endNode) {
 	}
 }
 
-function render(input) {
+function render(input, options) {
+	var automaticParagraphs = Boolean(options && options.automaticParagraphs);
+
 	var tokens = tokenize(input);
 	var openTags = [];
 	var openTagNames = [];
@@ -165,6 +171,10 @@ function render(input) {
 
 	function createSeriesNavigation(token) {
 		return createSeriesLink('&lt;&lt;&lt; PREV', token.previous) + ' | ' + createSeriesLink('FIRST', token.first) + ' | ' + createSeriesLink('NEXT &gt;&gt;&gt;', token.next);
+	}
+
+	if (automaticParagraphs) {
+		append('<p>');
 	}
 
 	for (var i = 0; i < tokens.length; i++) {
@@ -264,9 +274,32 @@ function render(input) {
 				break;
 
 			case LINE_BREAK:
-				// TODO: Turn two consecutive line breaks into a paragraph break with other line breaks in between,
-				//       unless it’s U+2028. U+2029 should also become (remain) a paragraph break.
+				if (automaticParagraphs) {
+					var count = 1;
+
+					while (i < tokens.length - 1 && tokens[i + 1].type === LINE_BREAK) {
+						count++;
+						i++;
+					}
+
+					if (count > 1) {
+						append('</p>');
+						append(new Array(count - 1).join('<br>'));
+						append('<p>');
+						break;
+					}
+				}
+
 				append('<br>');
+				break;
+
+			case FORCED_LINE_BREAK:
+				append('<br>');
+				break;
+
+			case FORCED_PARAGRAPH_BREAK:
+				append('</p>');
+				append('<p>');
 				break;
 
 			case SERIES_NAVIGATION:
@@ -278,9 +311,17 @@ function render(input) {
 		}
 	}
 
+	if (automaticParagraphs) {
+		if (tail.prev.text === '<p>') {
+			tail.prev.prev.next = null;
+		} else {
+			append('</p>');
+		}
+	}
+
 	var result = '';
 
-	while (head = head.next) {
+	while ((head = head.next)) {
 		if (head.text !== null) {
 			result += head.text;
 		}
