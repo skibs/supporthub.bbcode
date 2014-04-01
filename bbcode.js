@@ -49,11 +49,20 @@ var SERIES_NAVIGATION = 'SERIES_NAVIGATION';
 var CSS3_OPAQUE_COLOUR = /^(?:#?([\da-f]{3}|[\da-f]{6})|rgb\((?:(?:\s*(?:25[0-5]|2[0-4]\d|[01]?\d{1,2})\s*,){2}\s*(?:25[0-5]|2[0-4]\d|[01]?\d{1,2})\s*|(?:\s*(?:100|0?\d{1,2})%\s*,){2}\s*(?:100|0?\d{1,2})%\s*)\)|hsl\(\s*(?:180|1[0-7]\d|0?\d{1,2})\s*,\s*(?:100|0?\d{1,2})%\s*,\s*(?:100|0?\d{1,2})%\s*\)|black|silver|gr[ae]y|white|maroon|red|purple|fuchsia|green|lime|olive|yellow|navy|blue|teal|aqua|aliceblue|antiquewhite|aqua|aquamarine|azure|beige|bisque|blanchedalmond|blueviolet|brown|burlywood|cadetblue|chartreuse|chocolate|coral|cornflowerblue|cornsilk|crimson|cyan|darkblue|darkcyan|darkgoldenrod|darkgr[ae]y|darkgreen|darkkhaki|darkmagenta|darkolivegreen|darkorange|darkorchid|darkred|darksalmon|darkseagreen|darkslateblue|darkslategr[ae]y|darkturquoise|darkviolet|deeppink|deepskyblue|dimgr[ae]y|dodgerblue|firebrick|floralwhite|forestgreen|gainsboro|ghostwhite|gold|goldenrod|greenyellow|honeydew|hotpink|indianred|indigo|ivory|khaki|lavender|lavenderblush|lawngreen|lemonchiffon|lightblue|lightcoral|lightcyan|lightgoldenrodyellow|lightgr[ae]y|lightgreen|lightpink|lightsalmon|lightseagreen|lightskyblue|lightslategr[ae]y|lightsteelblue|lightyellow|limegreen|linen|mediumaquamarine|mediumblue|mediumorchid|mediumpurple|mediumseagreen|mediumslateblue|mediumspringgreen|mediumturquoise|mediumvioletred|midnightblue|mintcream|mistyrose|moccasin|navajowhite|oldlace|olivedrab|orange|orangered|orchid|palegoldenrod|palegreen|paleturquoise|palevioletred|papayawhip|peachpuff|peru|pink|plum|powderblue|rosybrown|royalblue|saddlebrown|salmon|sandybrown|seagreen|seashell|sienna|skyblue|slateblue|slategr[ae]y|snow|springgreen|steelblue|tan|thistle|tomato|turquoise|violet|wheat|whitesmoke|yellowgreen)$/i;
 
 function tokenize(input) {
-	var TOKEN = /\[([bisu]|sub|sup|quote|left|center|right)\]|\[\/([bisu]|sub|sup|color|quote|left|center|right|url)\]|\[(color|quote|url)=(?:"([^"]+)"|(\S*?))\]|:(icon|link)([\w-]+):|:([\w-]+)icon:|(\r?\n?-{5,}\r?\n?)|(\r\n|[\r\n\u2028\u2029])|\((c|r|tm)\)|(\bhttps?:\/\/(?:[^\s?!.[\]]|[?!.](?=\w))+)|\[(\d+|-)\s*,\s*(\d+|-)\s*,\s*(\d+|-)\]|[^-h\r\n\u2028\u2029([:]+|[\S\s]/gi;
+	var TOKEN = /\[([bisu]|sub|sup|quote|left|center|right)\]|\[\/([bisu]|sub|sup|color|quote|left|center|right|url)\]|\[(color|quote|url)=(?:"([^"]+)"|(\S*?))\]|:(icon|link)([\w-]+):|:([\w-]+)icon:|(\r?\n?-{5,}\r?\n?)|(\r\n|[\r\n\u2028\u2029])|\((c|r|tm)\)|(\bhttps?:\/\/(?:[^\s?!.[\]]|[?!.](?=\w))+)|\[(\d+|-)\s*,\s*(\d+|-)\s*,\s*(\d+|-)\]/gi;
 	var tokens = [];
+	var end = 0;
 	var m;
 
 	while ((m = TOKEN.exec(input))) {
+		var start = m.index;
+
+		if (start !== end) {
+			tokens.push({ type: TEXT, text: input.substring(end, start) });
+		}
+
+		end = start + m[0].length;
+
 		var token =
 			m[1] !== undefined  ? { type: OPEN_TAG, name: m[1].toLowerCase() } :
 			m[2] !== undefined  ? { type: CLOSE_TAG, name: m[2].toLowerCase() } :
@@ -72,6 +81,10 @@ function tokenize(input) {
 		token.text = m[11] === undefined ? m[0] : symbols[m[11].toLowerCase()];
 
 		tokens.push(token);
+	}
+
+	if (end !== input.length) {
+		tokens.push({ type: TEXT, text: input.substring(end) });
 	}
 
 	return tokens;
