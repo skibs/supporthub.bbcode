@@ -56,29 +56,29 @@ function tokenize(input) {
 
 	while ((m = TOKEN.exec(input))) {
 		var start = m.index;
+		var text = m[0];
 
 		if (start !== end) {
 			tokens.push({ type: TEXT, text: input.substring(end, start) });
 		}
 
-		end = start + m[0].length;
+		end = start + text.length;
 
 		var token =
-			m[1] !== undefined  ? { type: OPEN_TAG, name: m[1].toLowerCase() } :
-			m[2] !== undefined  ? { type: CLOSE_TAG, name: m[2].toLowerCase() } :
-			m[3] !== undefined  ? { type: OPEN_TAG, name: m[3].toLowerCase(), value: m[4] !== undefined ? m[4] : m[5] } :
-			m[6] === 'icon'     ? { type: ICON_AND_USERNAME_LINK, username: m[7] } :
-			m[6] === 'link'     ? { type: USERNAME_ONLY_LINK, username: m[7] } :
-			m[8] !== undefined  ? { type: ICON_ONLY_LINK, username: m[8] } :
-			m[9] !== undefined  ? { type: HORIZONTAL_RULE } :
-			m[10] === '\u2028'  ? { type: FORCED_LINE_BREAK } :
-			m[10] === '\u2029'  ? { type: FORCED_PARAGRAPH_BREAK } :
-			m[10] !== undefined ? { type: LINE_BREAK } :
-			m[12] !== undefined ? { type: AUTOMATIC_LINK } :
-			m[13] !== undefined ? { type: SERIES_NAVIGATION, previous: m[13], first: m[14], next: m[15] } :
-			                      { type: TEXT };
-
-		token.text = m[11] === undefined ? m[0] : symbols[m[11].toLowerCase()];
+			m[1] !== undefined  ? { type: OPEN_TAG, name: m[1].toLowerCase(), text: text } :
+			m[2] !== undefined  ? { type: CLOSE_TAG, name: m[2].toLowerCase(), text: text } :
+			m[3] !== undefined  ? { type: OPEN_TAG, name: m[3].toLowerCase(), value: m[4] !== undefined ? m[4] : m[5], text: text } :
+			m[6] === 'icon'     ? { type: ICON_AND_USERNAME_LINK, username: m[7], text: text } :
+			m[6] === 'link'     ? { type: USERNAME_ONLY_LINK, username: m[7], text: text } :
+			m[8] !== undefined  ? { type: ICON_ONLY_LINK, username: m[8], text: text } :
+			m[9] !== undefined  ? { type: HORIZONTAL_RULE, text: text } :
+			m[10] === '\u2028'  ? { type: FORCED_LINE_BREAK, text: text } :
+			m[10] === '\u2029'  ? { type: FORCED_PARAGRAPH_BREAK, text: text } :
+			m[10] !== undefined ? { type: LINE_BREAK, text: text } :
+			m[11] !== undefined ? { type: TEXT, text: symbols[m[11].toLowerCase()] } :
+			m[12] !== undefined ? { type: AUTOMATIC_LINK, text: text } :
+			m[13] !== undefined ? { type: SERIES_NAVIGATION, previous: m[13], first: m[14], next: m[15], text: text } :
+			null;
 
 		tokens.push(token);
 	}
